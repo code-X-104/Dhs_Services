@@ -1,0 +1,20 @@
+{
+  "235737A57Q": {
+    "item": "2 T-Shirts, 1 Bilderrahmen und ein iPhone",
+    "status": "Unterwegs",
+    "location": "Los Angeles",
+    "updated": "2025-07-01 10:30 Uhr"
+  },
+  "TRK456": {
+    "item": "Lehrbücher",
+    "status": "Zugestellt",
+    "location": "Schulrezeption",
+    "updated": "2025-06-30 15:45 Uhr"
+  },
+  "TRK789": {
+    "item": "Schuluniformen",
+    "status": "In Zustellung",
+    "location": "Lieferwagen – Ikeja",
+    "updated": "2025-07-02 08:00 Uhr"
+  }
+}
