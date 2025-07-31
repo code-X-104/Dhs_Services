@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>VIP Clan Scrim Tracker</title>
+  <style>
+    body {
+      background: #0a0a0a;
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    img.logo {
+      width: 150px;
+      margin-bottom: 20px;
+      animation: pulse 2s infinite;
+    }
+    h1 {
+      color: #ff4444;
+      text-shadow: 0 0 10px #ff0000;
+    }
+    button {
+      background: #ff2222;
+      border: none;
+      padding: 12px 25px;
+      color: white;
+      font-size: 18px;
+      border-radius: 10px;
+      margin: 10px;
+      cursor: pointer;
+      transition: transform 0.2s ease-in-out;
+    }
+    button:hover {
+      background: #ff5555;
+      transform: scale(1.05);
+    }
+    .team {
+      background: #1a1a1a;
+      margin: 10px auto;
+      padding: 15px;
+      width: 80%;
+      border-radius: 10px;
+      box-shadow: 0 0 15px #ff2222;
+    }
+    .stat-inputs input {
+      width: 50px;
+      margin: 0 5px;
+      border-radius: 5px;
+      border: none;
+      padding: 5px;
+      font-size: 14px;
+    }
+    #topPlayers {
+      background: #222;
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 30px;
+      box-shadow: 0 0 10px #00ff99;
+    }
+    table {
+      width: 80%;
+      margin: 0 auto;
+      color: #fff;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #444;
+      padding: 8px;
+    }
+    th {
+      background: #ff3333;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <img src="vip_logo.jpeg" class="logo" alt="VIP Logo">
+  <h1>VIP Clan Scrim Tracker</h1>
+  <button onclick="submitStats()">📊 Submit Round Stats</button>
+  <button onclick="shuffleTeams()">🔀 Shuffle Teams</button>
+  <button onclick="nextRound()">➡️ Start Next Round</button>
+  <button onclick="showTopPlayers()">🏆 Show Top 8 Players</button>
+  <h3>Current Round: <span id="roundNum">1</span> / 5</h3>
+
+  <div id="teams"></div>
+  <div id="topPlayers"></div>
+
+  <audio id="shuffleSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+
+  <script>
+    let round = 1;
+    const maxRounds = 5;
+
+    let players = Array.from({length: 30}, (_, i) => ({
+      name: 'Player ' + (i + 1),
+      kills: 0,
+      assists: 0,
+      rounds: []  // track stats over rounds
+    }));
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    function displayTeams() {
+      const teamsDiv = document.getElementById("teams");
+      teamsDiv.innerHTML = "";
+      for (let i = 0; i < 28; i += 4) {
+        const team = players.slice(i, i + 4);
+        const div = document.createElement("div");
+        div.className = "team";
+        div.innerHTML = `<strong>Team ${(i/4)+1}</strong><br>` + team.map(p => `
+          ${p.name}
+          <div class="stat-inputs">
+            Kills: <input type="number" id="k_${p.name}" value="0">
+            Assists: <input type="number" id="a_${p.name}" value="0">
+          </div>
+        `).join("");
+        teamsDiv.appendChild(div);
+      }
+
+      const floaters = players.slice(28);
+      if (floaters.length > 0) {
+        const floaterDiv = document.createElement("div");
+        floaterDiv.className = "team";
+        floaterDiv.innerHTML = `<strong>Floaters</strong><br>` + floaters.map(p => `
+          ${p.name}
+          <div class="stat-inputs">
+            Kills: <input type="number" id="k_${p.name}" value="0">
+            Assists: <input type="number" id="a_${p.name}" value="0">
+          </div>
+        `).join("");
+        teamsDiv.appendChild(floaterDiv);
+      }
+    }
+
+    function submitStats() {
+      players.forEach(p => {
+        const k = parseInt(document.getElementById("k_" + p.name).value) || 0;
+        const a = parseInt(document.getElementById("a_" + p.name).value) || 0;
+        p.rounds.push({ kills: k, assists: a });
+      });
+      alert("✅ Stats Submitted for Round " + round);
+    }
+
+    function nextRound() {
+      if (round >= maxRounds) {
+        alert("✅ All 5 rounds completed. Click 'Show Top Players'");
+        return;
+      }
+      round++;
+      document.getElementById("roundNum").innerText = round;
+      displayTeams();
+    }
+
+    function showTopPlayers() {
+      // Calculate totals
+      players.forEach(p => {
+        p.totalKills = p.rounds.reduce((sum, r) => sum + r.kills, 0);
+        p.totalAssists = p.rounds.reduce((sum, r) => sum + r.assists, 0);
+        p.total = p.totalKills + p.totalAssists;
+      });
+
+      const sorted = [...players].sort((a, b) => b.total - a.total);
+      const top8 = sorted.slice(0, 8);
+
+      const div = document.getElementById("topPlayers");
+      div.innerHTML = `
+        <h2>🏆 Top 8 Players (After 5 Rounds)</h2>
+        <table>
+          <tr><th>Rank</th><th>Player</th><th>Kills</th><th>Assists</th><th>Total</th><th>Role</th></tr>
+          ${top8.map((p, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td>${p.name}</td>
+              <td>${p.totalKills}</td>
+              <td>${p.totalAssists}</td>
+              <td>${p.total}</td>
+              <td>${i < 6 ? '✅ Starter' : '🪑 Sub'}</td>
+            </tr>
+          `).join("")}
+        </table>
+      `;
+    }
+
+    function shuffleTeams() {
+      document.getElementById("shuffleSound").play();
+      players.sort((a, b) => (b.kills + b.assists) - (a.kills + a.assists));
+      const topHalf = players.slice(0, 15);
+      const bottomHalf = players.slice(15);
+
+      let reshuffled = [];
+      for (let i = 0; i < 15; i++) {
+        reshuffled.push(topHalf[i]);
+        reshuffled.push(bottomHalf[i]);
+      }
+      players = reshuffled;
+      displayTeams();
+    }
+
+    // Initial display
+    displayTeams();
+  </script>
+</body>
+</html>
