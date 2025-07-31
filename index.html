@@ -1,34 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta charset="UTF-8">
   <title>VIP Clan Scrim Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
       background: #0a0a0a;
       color: #fff;
       font-family: 'Segoe UI', sans-serif;
       text-align: center;
-      padding: 20px;
+      padding: 10px;
+      margin: 0;
+    }
+    .dark-mode {
+      background: #fff;
+      color: #000;
     }
     img.logo {
-      width: 150px;
-      margin-bottom: 20px;
+      width: 120px;
+      margin: 10px auto;
       animation: pulse 2s infinite;
     }
     h1 {
       color: #ff4444;
       text-shadow: 0 0 10px #ff0000;
+      font-size: 1.6em;
     }
     button {
       background: #ff2222;
       border: none;
-      padding: 12px 25px;
+      padding: 10px 18px;
       color: white;
-      font-size: 18px;
-      border-radius: 10px;
-      margin: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      margin: 5px;
       cursor: pointer;
       transition: transform 0.2s ease-in-out;
     }
@@ -36,41 +45,46 @@
       background: #ff5555;
       transform: scale(1.05);
     }
-    .team {
+    .team, #topPlayers {
       background: #1a1a1a;
       margin: 10px auto;
-      padding: 15px;
-      width: 80%;
+      padding: 10px;
+      width: 100%;
+      max-width: 500px;
       border-radius: 10px;
       box-shadow: 0 0 15px #ff2222;
     }
-    .stat-inputs input {
-      width: 50px;
-      margin: 0 5px;
+    .stat-inputs input[type="number"], .stat-inputs input[type="text"] {
+      width: 60px;
+      margin: 4px 3px;
       border-radius: 5px;
       border: none;
-      padding: 5px;
+      padding: 4px;
       font-size: 14px;
     }
-    #topPlayers {
-      background: #222;
-      border-radius: 10px;
-      padding: 20px;
-      margin-top: 30px;
-      box-shadow: 0 0 10px #00ff99;
-    }
     table {
-      width: 80%;
-      margin: 0 auto;
+      width: 100%;
       color: #fff;
       border-collapse: collapse;
+      font-size: 14px;
     }
     th, td {
       border: 1px solid #444;
-      padding: 8px;
+      padding: 5px;
     }
     th {
       background: #ff3333;
+    }
+    .dark-mode th {
+      background: #222;
+      color: #fff;
+    }
+    #confetti-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 1000;
     }
     @keyframes pulse {
       0% { transform: scale(1); }
@@ -80,12 +94,18 @@
   </style>
 </head>
 <body>
-  <img src="vip_logo.jpg" class="logo" alt="VIP Logo">
+  <canvas id="confetti-canvas"></canvas>
+  <img src="vip_logo.jpeg" class="logo" alt="VIP Logo">
   <h1>VIP Clan Scrim Tracker</h1>
+
+  <button onclick="toggleDarkMode()">🌓 Toggle Mode</button>
   <button onclick="submitStats()">📊 Submit Round Stats</button>
   <button onclick="shuffleTeams()">🔀 Shuffle Teams</button>
   <button onclick="nextRound()">➡️ Start Next Round</button>
   <button onclick="showTopPlayers()">🏆 Show Top 8 Players</button>
+  <button onclick="exportCSV()">📤 Export CSV</button>
+  <button onclick="filterTopKillers()">🔎 Filter Kills > 10</button>
+
   <h3>Current Round: <span id="roundNum">1</span> / 5</h3>
 
   <div id="teams"></div>
@@ -93,16 +113,25 @@
 
   <audio id="shuffleSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
 
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script>
     let round = 1;
     const maxRounds = 5;
 
-    let players = Array.from({length: 30}, (_, i) => ({
+    let players = JSON.parse(localStorage.getItem("players")) || Array.from({ length: 30 }, (_, i) => ({
       name: 'Player ' + (i + 1),
       kills: 0,
       assists: 0,
-      rounds: []  // track stats over rounds
+      rounds: []
     }));
+
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark-mode");
+    }
+
+    function savePlayers() {
+      localStorage.setItem("players", JSON.stringify(players));
+    }
 
     function shuffle(array) {
       for (let i = array.length - 1; i > 0; i--) {
@@ -111,15 +140,16 @@
       }
     }
 
-    function displayTeams() {
+    function displayTeams(filteredList = null) {
+      const list = filteredList || players;
       const teamsDiv = document.getElementById("teams");
       teamsDiv.innerHTML = "";
       for (let i = 0; i < 28; i += 4) {
-        const team = players.slice(i, i + 4);
+        const team = list.slice(i, i + 4);
         const div = document.createElement("div");
         div.className = "team";
         div.innerHTML = `<strong>Team ${(i/4)+1}</strong><br>` + team.map(p => `
-          ${p.name}
+          <input type="text" value="${p.name}" onchange="renamePlayer('${p.name}', this.value)">
           <div class="stat-inputs">
             Kills: <input type="number" id="k_${p.name}" value="0">
             Assists: <input type="number" id="a_${p.name}" value="0">
@@ -128,12 +158,12 @@
         teamsDiv.appendChild(div);
       }
 
-      const floaters = players.slice(28);
+      const floaters = list.slice(28);
       if (floaters.length > 0) {
         const floaterDiv = document.createElement("div");
         floaterDiv.className = "team";
         floaterDiv.innerHTML = `<strong>Floaters</strong><br>` + floaters.map(p => `
-          ${p.name}
+          <input type="text" value="${p.name}" onchange="renamePlayer('${p.name}', this.value)">
           <div class="stat-inputs">
             Kills: <input type="number" id="k_${p.name}" value="0">
             Assists: <input type="number" id="a_${p.name}" value="0">
@@ -143,18 +173,25 @@
       }
     }
 
+    function renamePlayer(oldName, newName) {
+      players.find(p => p.name === oldName).name = newName;
+      savePlayers();
+      displayTeams();
+    }
+
     function submitStats() {
       players.forEach(p => {
-        const k = parseInt(document.getElementById("k_" + p.name).value) || 0;
-        const a = parseInt(document.getElementById("a_" + p.name).value) || 0;
+        const k = parseInt(document.getElementById("k_" + p.name)?.value) || 0;
+        const a = parseInt(document.getElementById("a_" + p.name)?.value) || 0;
         p.rounds.push({ kills: k, assists: a });
       });
+      savePlayers();
       alert("✅ Stats Submitted for Round " + round);
     }
 
     function nextRound() {
       if (round >= maxRounds) {
-        alert("✅ All 5 rounds completed. Click 'Show Top Players'");
+        alert("✅ All 5 rounds completed.");
         return;
       }
       round++;
@@ -163,7 +200,6 @@
     }
 
     function showTopPlayers() {
-      // Calculate totals
       players.forEach(p => {
         p.totalKills = p.rounds.reduce((sum, r) => sum + r.kills, 0);
         p.totalAssists = p.rounds.reduce((sum, r) => sum + r.assists, 0);
@@ -175,7 +211,7 @@
 
       const div = document.getElementById("topPlayers");
       div.innerHTML = `
-        <h2>🏆 Top 8 Players (After 5 Rounds)</h2>
+        <h2>🏆 Top 8 Players</h2>
         <table>
           <tr><th>Rank</th><th>Player</th><th>Kills</th><th>Assists</th><th>Total</th><th>Role</th></tr>
           ${top8.map((p, i) => `
@@ -190,6 +226,7 @@
           `).join("")}
         </table>
       `;
+      confetti(); // 🎉 Trigger
     }
 
     function shuffleTeams() {
@@ -197,7 +234,6 @@
       players.sort((a, b) => (b.kills + b.assists) - (a.kills + a.assists));
       const topHalf = players.slice(0, 15);
       const bottomHalf = players.slice(15);
-
       let reshuffled = [];
       for (let i = 0; i < 15; i++) {
         reshuffled.push(topHalf[i]);
@@ -207,7 +243,32 @@
       displayTeams();
     }
 
-    // Initial display
+    function exportCSV() {
+      let csv = "Name,Total Kills,Total Assists,Total\n";
+      players.forEach(p => {
+        const kills = p.rounds.reduce((sum, r) => sum + r.kills, 0);
+        const assists = p.rounds.reduce((sum, r) => sum + r.assists, 0);
+        csv += `${p.name},${kills},${assists},${kills + assists}\n`;
+      });
+      const blob = new Blob([csv], { type: "text/csv" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "vip_scrim_stats.csv";
+      link.click();
+    }
+
+    function filterTopKillers() {
+      const filtered = players.filter(p => p.rounds.reduce((sum, r) => sum + r.kills, 0) > 10);
+      displayTeams(filtered);
+    }
+
+    function confetti() {
+      confettiCanvas = document.getElementById("confetti-canvas");
+      const confettiSettings = { particleCount: 200, spread: 100 };
+      confettiLib = window.confetti.create(confettiCanvas, { resize: true });
+      confettiLib({...confettiSettings, origin: { y: 0.6 } });
+    }
+
     displayTeams();
   </script>
 </body>
